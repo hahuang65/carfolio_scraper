@@ -9,7 +9,7 @@ use super::make::Make;
 pub struct Model {
     pub make: Make,
     pub name: String,
-    pub year: Option<u16>,
+    pub year: String,
     pub url: String
 }
 
@@ -41,18 +41,18 @@ fn extract_name(div: ElementRef) -> String {
     }
 }
 
-fn extract_year(div: ElementRef) -> Option<u16> {
+fn extract_year(div: ElementRef) -> String {
     let selector = Selector::parse("span.Year").unwrap();
     let alt_selector = Selector::parse("span.model-year").unwrap();
     let data = extract_data(div);
 
     match data.select(&selector).next() {
-        Some(inner) => Some(inner.inner_html().parse::<u16>().unwrap()),
+        Some(inner) => inner.inner_html(),
         None        => match data.select(&alt_selector).next() {
-                         Some(inner) => Some(inner.inner_html().parse::<u16>().unwrap()),
+                         Some(inner) => inner.inner_html(),
                          None        => {
                              error!("Could not find year info in {:?}", data.inner_html());
-                             None
+                             "".to_string()
                          }
                        }
     }
@@ -72,7 +72,7 @@ pub async fn models(make: Make) -> Result<Vec<Model>, reqwest::Error> {
         let name = extract_name(*div);
         let url = extract_url(*div);
 
-        debug!("Model: {:?} {} {} - {}", year, make.name, name, url);
+        debug!("Model: {} {} {} - {}", year, make.name, name, url);
         Model {
             make: make.clone(),
             name: name,
