@@ -2,6 +2,10 @@ use scraper::html::Html;
 use scraper::Selector;
 use scraper::element_ref::ElementRef;
 
+use crate::error::AppError;
+use crate::error::AppError::*;
+use crate::error::StandardErrorType::*;
+
 const BASE_URL: &str = "https://carfolio.com/specifications";
 
 #[derive(Clone)]
@@ -16,45 +20,69 @@ fn divs(html: &Html) -> Vec<ElementRef<'_>> {
     html.select(&selector).collect()
 }
 
-fn extract_link(div: ElementRef) -> ElementRef {
+fn extract_link(div: ElementRef) -> Result<ElementRef, AppError> {
     let selector = Selector::parse("a.man").unwrap();
-    div.select(&selector).next().unwrap()
+
+    match div.select(&selector).next() {
+        Some(elem) => Ok(elem),
+        None       => Err(StandardError(ElementNotFound))
+    }
 }
 
-fn extract_url(div: ElementRef) -> String {
-    let link = extract_link(div);
-    let path = link.value().attr("href").unwrap().to_string();
+fn extract_url(div: ElementRef) -> Result<String, AppError> {
+    let link = extract_link(div)?;
 
-    format!("{}/{}", BASE_URL, path)
+    match link.value().attr("href") {
+        Some(href) => Ok(format!("{}/{}", BASE_URL, href.to_string())),
+        None       => Err(StandardError(AttributeNotFound))
+    }
 }
 
-fn extract_name(div: ElementRef) -> String {
-    let link = extract_link(div);
-    link.inner_html()
+fn extract_name(div: ElementRef) -> Result<String, AppError> {
+    let link = extract_link(div)?;
+    Ok(link.inner_html())
 }
 
-fn extract_country(div: ElementRef) -> String {
+fn extract_country(div: ElementRef) -> Result<String, AppError> {
     let selector = Selector::parse("div.footer").unwrap();
-    div.select(&selector).next().unwrap().inner_html()
+
+    match div.select(&selector).next() {
+        Some(elem) => Ok(elem.inner_html()),
+        None       => Err(StandardError(ElementNotFound))
+    }
 }
 
 #[tokio::main]
-pub async fn makes() -> Result<Vec<Make>, reqwest::Error> {
+pub async fn makes() -> Result<Vec<Make>, AppError> {
     info!("Requesting Makes data");
 
     let html = match crate::fetch_page(BASE_URL).await {
         Ok(html) => html,
-        Err(e)   => return Err(e),
+        Err(e)   => return Err(ReqwestError(e)),
     };
 
-    let makes = divs(&html).iter().map(|div| {
-        let url = extract_url(*div);
-        let name = extract_name(*div);
-        let country = extract_country(*div);
-        debug!("Make: {} ({}) - {}", name, country, url);
+    divs(&html).iter().map(|div| {
+        debug!("HTML div: {:?}", div.inner_html().trim());
 
-        Make { name: name, country: country, url: url }
-    }).collect::<Vec<Make>>();
+        let url = match extract_url(*div) {
+            Ok(url) => url,
+            Err(e)  => return Err(e)
+        };
+        
+        let name = match extract_name(*div) {
+            Ok(url) => url,
+            Err(e)  => return Err(e)
+        };
 
-    Ok(makes)
+        let country = match extract_country(*div) {
+            Ok(url) => url,
+            Err(_)  => {
+                warn!("Unable to find country for make: {}", name);
+                "".to_string()
+            }
+        };
+        info!("Make: {} ({}) - {}", name, country, url);
+
+        Ok(Make { name: name, country: country, url: url })
+    }).collect::<Result<Vec<Make>, AppError>>()
 }

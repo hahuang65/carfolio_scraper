@@ -8,6 +8,7 @@ extern crate pretty_env_logger;
 
 use scraper::html::Html;
 
+mod error;
 mod carfolio;
 
 fn main() {
