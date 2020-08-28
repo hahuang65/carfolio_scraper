@@ -10,6 +10,7 @@ edition = "2018"
 log = "0.4"
 pretty_env_logger = "0.4"
 lazy_static = "1.4.0"
+logging_timer = "1.0.0"
 reqwest = { version = "0.10", features = ["json"] }
 tokio = { version = "0.2", features = ["full"] }
 scraper = "0.12.0"

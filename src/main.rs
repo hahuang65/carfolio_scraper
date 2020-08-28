@@ -6,6 +6,8 @@ extern crate lazy_static;
 
 extern crate pretty_env_logger;
 
+use logging_timer::time;
+
 use scraper::html::Html;
 use scraper::Selector;
 use scraper::element_ref::ElementRef;
@@ -33,6 +35,7 @@ struct Page {
 }
 
 impl Page {
+    #[time("info", "Page::{}")]
     fn new(url: &str) -> Page {
         match Self::get_html(url) {
             Ok(html) => Self { url: String::from(url), html: html },

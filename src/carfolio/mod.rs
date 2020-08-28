@@ -1,13 +1,12 @@
-use std::time::Instant;
+use logging_timer::time;
 
 mod make;
 mod model;
 
 use crate::error::AppError;
 
+#[time("info")]
 pub(crate) fn scrape() -> Result<(), AppError> {
-    let before = Instant::now();
-
     match make::makes() {
         Ok(makes) => {
             makes.iter().map(|make| {
@@ -15,11 +14,9 @@ pub(crate) fn scrape() -> Result<(), AppError> {
                     Ok(model) => Ok(model),
                     Err(e) => return Err(e)
                 }
-            }).count()
+            }).count();
+            Ok(())
         },
         Err(e) => return Err(e)
-    };
-
-    info!("Runtime: {:.2?}", before.elapsed());
-    Ok(())
+    }
 }
