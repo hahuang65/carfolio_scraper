@@ -1,10 +1,6 @@
-use scraper::html::Html;
-use scraper::Selector;
 use scraper::element_ref::ElementRef;
 
 use crate::error::AppError;
-use crate::error::AppError::*;
-use crate::error::StandardErrorType::*;
 
 const BASE_URL: &str = "https://carfolio.com/specifications";
 
@@ -15,27 +11,15 @@ pub struct Make {
     pub url: String
 }
 
-fn divs(html: &Html) -> Vec<ElementRef<'_>> {
-    let selector = Selector::parse("div.grid div[class^=\"m\"]").unwrap();
-    html.select(&selector).collect()
-}
-
 fn extract_link(div: ElementRef) -> Result<ElementRef, AppError> {
-    let selector = Selector::parse("a.man").unwrap();
-
-    match div.select(&selector).next() {
-        Some(elem) => Ok(elem),
-        None       => Err(StandardError(ElementNotFound))
-    }
+    crate::find_elem(div, String::from("a.man"))
 }
 
 fn extract_url(div: ElementRef) -> Result<String, AppError> {
     let link = extract_link(div)?;
+    let href = crate::find_attr(link, String::from("href"))?;
 
-    match link.value().attr("href") {
-        Some(href) => Ok(format!("{}/{}", BASE_URL, href.to_string())),
-        None       => Err(StandardError(AttributeNotFound))
-    }
+    Ok(format!("{}/{}", BASE_URL, href))
 }
 
 fn extract_name(div: ElementRef) -> Result<String, AppError> {
@@ -44,40 +28,26 @@ fn extract_name(div: ElementRef) -> Result<String, AppError> {
 }
 
 fn extract_country(div: ElementRef) -> Result<String, AppError> {
-    let selector = Selector::parse("div.footer").unwrap();
-
-    match div.select(&selector).next() {
-        Some(elem) => Ok(elem.inner_html()),
-        None       => Err(StandardError(ElementNotFound))
-    }
+    let elem = crate::find_elem(div, String::from("div.footer"))?;
+    Ok(elem.inner_html())
 }
 
 #[tokio::main]
 pub async fn makes() -> Result<Vec<Make>, AppError> {
     info!("Requesting Makes data");
 
-    let html = match crate::fetch_page(BASE_URL).await {
-        Ok(html) => html,
-        Err(e)   => return Err(ReqwestError(e)),
-    };
+    let html = crate::fetch_page(BASE_URL).await?;
+    let selector = String::from("div.grid div[class^=\"m\"]");
 
-    divs(&html).iter().map(|div| {
+    crate::divs(&html, selector).iter().map(|div| {
         debug!("HTML div: {:?}", div.inner_html().trim());
 
-        let url = match extract_url(*div) {
-            Ok(url) => url,
-            Err(e)  => return Err(e)
-        };
-        
-        let name = match extract_name(*div) {
-            Ok(url) => url,
-            Err(e)  => return Err(e)
-        };
-
+        let url = extract_url(*div)?;
+        let name = extract_name(*div)?;
         let country = match extract_country(*div) {
-            Ok(url) => url,
+            Ok(country) => country,
             Err(_)  => {
-                warn!("Unable to find country for make: {}", name);
+                warn!("Unable to find country for make: {} ({})", name, url);
                 "".to_string()
             }
         };

@@ -1,6 +1,6 @@
-use scraper::html::Html;
-use scraper::Selector;
 use scraper::element_ref::ElementRef;
+
+use crate::error::AppError;
 
 const BASE_URL: &str = "https://carfolio.com";
 
@@ -13,73 +13,50 @@ pub struct Model {
     pub url: String
 }
 
-fn divs(html: &Html) -> Vec<ElementRef<'_>> {
-    let selector = Selector::parse("div.grid div.grid-card").unwrap();
-    html.select(&selector).collect()
+fn extract_data(div: ElementRef) -> Result<ElementRef, AppError> {
+    crate::find_elem(div, String::from("div.card-head a span.automobile"))
 }
 
-fn extract_data(div: ElementRef) -> ElementRef {
-    let selector = Selector::parse("div.card-head a span.automobile").unwrap();
-    div.select(&selector).next().unwrap()
+fn extract_url(div: ElementRef) -> Result<String, AppError> {
+    let elem = crate::find_elem(div, String::from("div.card-head a"))?;
+    let href = crate::find_attr(elem, String::from("href"))?;
+
+    Ok(format!("{}/{}", BASE_URL, href))
 }
 
-fn extract_url(div: ElementRef) -> String {
-    let selector = Selector::parse("div.card-head a").unwrap();
-    let link = div.select(&selector).next().unwrap();
-    let path = link.value().attr("href").unwrap().to_string();
-
-    format!("{}/{}", BASE_URL, path)
+fn extract_name(div: ElementRef) -> Result<String, AppError> {
+    let elem = crate::find_elem(div, String::from("span.model.name"))?;
+    Ok(elem.inner_html())
 }
 
-fn extract_name(div: ElementRef) -> String {
-    let selector = Selector::parse("span.model.name").unwrap();
+fn extract_year(div: ElementRef) -> Result<String, AppError> {
+    let selectors = vec![String::from("span.Year"), String::from("span.model-year")];
 
-    let data = extract_data(div);
-    match data.select(&selector).next() {
-        Some(inner) => inner.inner_html(),
-        None        => "".to_string()
-    }
-}
+    let data = extract_data(div)?;
+    let elem = crate::search_elem(data, selectors)?;
 
-fn extract_year(div: ElementRef) -> String {
-    let selector = Selector::parse("span.Year").unwrap();
-    let alt_selector = Selector::parse("span.model-year").unwrap();
-    let data = extract_data(div);
-
-    match data.select(&selector).next() {
-        Some(inner) => inner.inner_html(),
-        None        => match data.select(&alt_selector).next() {
-                         Some(inner) => inner.inner_html(),
-                         None        => {
-                             error!("Could not find year info in {:?}", data.inner_html());
-                             "".to_string()
-                         }
-                       }
-    }
+    Ok(elem.inner_html())
 }
 
 #[tokio::main]
-pub async fn models(make: Make) -> Result<Vec<Model>, reqwest::Error> {
+pub async fn models(make: Make) -> Result<Vec<Model>, AppError> {
     info!("Requesting Models data for {}", make.name);
 
-    let html = match crate::fetch_page(&make.url).await {
-        Ok(html)  => html,
-        Err(e)    => return Err(e),
-    };
+    let html = crate::fetch_page(&make.url).await?;
+    let selector = String::from("div.grid div.grid-card");
 
-    let models = divs(&html).iter().map(|div| {
-        let year = extract_year(*div);
-        let name = extract_name(*div);
-        let url = extract_url(*div);
+    crate::divs(&html, selector).iter().map(|div| {
+        let name = extract_name(*div)?;
+        let url = extract_url(*div)?;
+        let year = match extract_year(*div) {
+            Ok(year) => year,
+            Err(_)   => {
+                warn!("Unable to find year for model: {} {} ({})", make.name, name, url);
+                "".to_string()
+            }
+        };
+        info!("Model: {} {} {} - {}", year, make.name, name, url);
 
-        debug!("Model: {} {} {} - {}", year, make.name, name, url);
-        Model {
-            make: make.clone(),
-            name: name,
-            year: year,
-            url: url
-        }
-    }).collect::<Vec<Model>>();
-
-    Ok(models)
+        Ok(Model { make: make.clone(), name: name, year: year, url: url })
+    }).collect::<Result<Vec<Model>, AppError>>()
 }
