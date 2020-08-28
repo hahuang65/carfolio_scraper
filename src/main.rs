@@ -27,34 +27,38 @@ lazy_static! {
     static ref REQWEST_CLIENT: reqwest::Client = reqwest::Client::new();
 }
 
-async fn fetch_page(url: &str) -> Result<Html, reqwest::Error> {
-    info!("Scraping HTML from {}", url);
-    let resp = REQWEST_CLIENT.get(url).send().await?;
-    let body = resp.text().await?;
-    
-    Ok(Html::parse_document(&body))
+struct Page {
+    url: String,
+    html: Html
 }
 
-fn divs(html: &Html, selector: String) -> Vec<ElementRef<'_>> {
-    let selector = Selector::parse(&selector).unwrap();
-    html.select(&selector).collect()
-}
+impl Page {
+    fn new(url: &str) -> Page {
+        match Self::get_html(url) {
+            Ok(html) => Self { url: String::from(url), html: html },
+            Err(e)   => panic!(e)
+        }
+    }
 
-fn find_elem(div: ElementRef, selector: String) -> Result<ElementRef, AppError> {
-    let selector = Selector::parse(&selector).unwrap();
+    #[tokio::main]
+    async fn get_html(url: &str) -> Result<Html, reqwest::Error> {
+        info!("Scraping HTML from {}", url);
+        let resp = REQWEST_CLIENT.get(url).send().await?;
+        let body = resp.text().await?;
+        
+        Ok(Html::parse_document(&body))
+    }
 
-    match div.select(&selector).next() {
-        Some(elem) => Ok(elem),
-        None       => Err(StandardError(ElementNotFound))
+    fn elements(&self, selector: &str) -> Vec<ElementRef> {
+        let selector = Selector::parse(&selector).unwrap();
+        self.html.select(&selector).collect()
     }
 }
 
-fn search_elem(div: ElementRef, selectors: Vec<String>) -> Result<ElementRef, AppError> {
+fn element_within<'a>(element: ElementRef<'a>, selectors: Vec<&'_ str>) -> Result<ElementRef<'a>, AppError> {
     let elem = selectors.iter().find_map(|selector| {
-        match find_elem(div, selector.clone()) {
-            Ok(elem) => Some(elem),
-            Err(_)   => None
-        }
+        let selector = Selector::parse(&selector).unwrap();
+        element.select(&selector).next()
     });
 
     match elem {
@@ -63,9 +67,16 @@ fn search_elem(div: ElementRef, selectors: Vec<String>) -> Result<ElementRef, Ap
     }
 }
 
-fn find_attr(div: ElementRef, attr_name: String) -> Result<String, AppError> {
-    match div.value().attr(&attr_name) {
+fn element_attr(element: ElementRef, selector: &str, attr: &str) -> Result<String, AppError> {
+    let elem = element_within(element, vec![selector])?;
+
+    match elem.value().attr(attr) {
         Some(attr) => Ok(attr.to_string()),
         None       => Err(StandardError(AttributeNotFound))
     }
+}
+
+fn inner_html(element: ElementRef, selector: &str) -> Result<String, AppError> {
+    let elem = element_within(element, vec![selector])?;
+    Ok(elem.inner_html())
 }

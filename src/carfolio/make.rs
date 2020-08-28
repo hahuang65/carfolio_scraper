@@ -11,36 +11,25 @@ pub struct Make {
     pub url: String
 }
 
-fn extract_link(div: ElementRef) -> Result<ElementRef, AppError> {
-    crate::find_elem(div, String::from("a.man"))
+fn extract_url(element: ElementRef) -> Result<String, AppError> {
+    let path = crate::element_attr(element, "a.man", "href")?;
+    Ok(format!("{}/{}", BASE_URL, path))
 }
 
-fn extract_url(div: ElementRef) -> Result<String, AppError> {
-    let link = extract_link(div)?;
-    let href = crate::find_attr(link, String::from("href"))?;
-
-    Ok(format!("{}/{}", BASE_URL, href))
+fn extract_name(element: ElementRef) -> Result<String, AppError> {
+    crate::inner_html(element, "a.man")
 }
 
-fn extract_name(div: ElementRef) -> Result<String, AppError> {
-    let link = extract_link(div)?;
-    Ok(link.inner_html())
+fn extract_country(element: ElementRef) -> Result<String, AppError> {
+    crate::inner_html(element, "div.footer")
 }
 
-fn extract_country(div: ElementRef) -> Result<String, AppError> {
-    let elem = crate::find_elem(div, String::from("div.footer"))?;
-    Ok(elem.inner_html())
-}
-
-#[tokio::main]
-pub async fn makes() -> Result<Vec<Make>, AppError> {
+pub(super) fn makes() -> Result<Vec<Make>, AppError> {
     info!("Requesting Makes data");
+    let page = crate::Page::new(BASE_URL);
 
-    let html = crate::fetch_page(BASE_URL).await?;
-    let selector = String::from("div.grid div[class^=\"m\"]");
-
-    crate::divs(&html, selector).iter().map(|div| {
-        debug!("HTML div: {:?}", div.inner_html().trim());
+    page.elements("div.grid div[class^=\"m\"]").iter().map(|div| {
+        debug!("div: {:?}", div.inner_html().trim());
 
         let url = extract_url(*div)?;
         let name = extract_name(*div)?;

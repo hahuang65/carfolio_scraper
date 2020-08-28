@@ -13,41 +13,30 @@ pub struct Model {
     pub url: String
 }
 
-fn extract_data(div: ElementRef) -> Result<ElementRef, AppError> {
-    crate::find_elem(div, String::from("div.card-head a span.automobile"))
+fn extract_url(element: ElementRef) -> Result<String, AppError> {
+    let path = crate::element_attr(element, "div.card-head a", "href")?;
+    Ok(format!("{}/{}", BASE_URL, path))
 }
 
-fn extract_url(div: ElementRef) -> Result<String, AppError> {
-    let elem = crate::find_elem(div, String::from("div.card-head a"))?;
-    let href = crate::find_attr(elem, String::from("href"))?;
-
-    Ok(format!("{}/{}", BASE_URL, href))
+fn extract_name(element: ElementRef) -> Result<String, AppError> {
+    crate::inner_html(element, "span.model.name")
 }
 
-fn extract_name(div: ElementRef) -> Result<String, AppError> {
-    let elem = crate::find_elem(div, String::from("span.model.name"))?;
+fn extract_year(element: ElementRef) -> Result<String, AppError> {
+    let span = crate::element_within(element, vec!["div.card-head a span.automobile"])?;
+    let elem = crate::element_within(span, vec!["span.Year", "span.model-year"])?;
     Ok(elem.inner_html())
 }
 
-fn extract_year(div: ElementRef) -> Result<String, AppError> {
-    let selectors = vec![String::from("span.Year"), String::from("span.model-year")];
-
-    let data = extract_data(div)?;
-    let elem = crate::search_elem(data, selectors)?;
-
-    Ok(elem.inner_html())
-}
-
-#[tokio::main]
-pub async fn models(make: Make) -> Result<Vec<Model>, AppError> {
+pub(super) fn models(make: Make) -> Result<Vec<Model>, AppError> {
     info!("Requesting Models data for {}", make.name);
+    let page = crate::Page::new(&make.url);
 
-    let html = crate::fetch_page(&make.url).await?;
-    let selector = String::from("div.grid div.grid-card");
+    page.elements("div.grid div.grid-card").iter().map(|div| {
+        debug!("div: {:?}", div.inner_html().trim());
 
-    crate::divs(&html, selector).iter().map(|div| {
-        let name = extract_name(*div)?;
         let url = extract_url(*div)?;
+        let name = extract_name(*div)?;
         let year = match extract_year(*div) {
             Ok(year) => year,
             Err(_)   => {
