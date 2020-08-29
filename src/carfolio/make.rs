@@ -1,6 +1,6 @@
 use scraper::element_ref::ElementRef;
 
-use crate::error::AppError;
+use crate::error::Error;
 
 const BASE_URL: &str = "https://carfolio.com/specifications";
 
@@ -11,20 +11,20 @@ pub struct Make {
     pub url: String
 }
 
-fn extract_url(element: ElementRef) -> Result<String, AppError> {
+fn extract_url(element: ElementRef) -> Result<String, Error> {
     let path = crate::element_attr(element, "a.man", "href")?;
     Ok(format!("{}/{}", BASE_URL, path))
 }
 
-fn extract_name(element: ElementRef) -> Result<String, AppError> {
+fn extract_name(element: ElementRef) -> Result<String, Error> {
     crate::inner_html(element, "a.man")
 }
 
-fn extract_country(element: ElementRef) -> Result<String, AppError> {
+fn extract_country(element: ElementRef) -> Result<String, Error> {
     crate::inner_html(element, "div.footer")
 }
 
-pub(super) fn makes() -> Result<Vec<Make>, AppError> {
+pub(super) fn makes() -> Result<Vec<Make>, Error> {
     info!("Requesting Makes data");
     let page = crate::Page::new(BASE_URL);
 
@@ -43,5 +43,5 @@ pub(super) fn makes() -> Result<Vec<Make>, AppError> {
         info!("Make: {} ({}) - {}", name, country, url);
 
         Ok(Make { name: name, country: country, url: url })
-    }).collect::<Result<Vec<Make>, AppError>>()
+    }).collect::<Result<Vec<Make>, Error>>()
 }

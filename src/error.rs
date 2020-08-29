@@ -1,43 +1,32 @@
 use std::{error, fmt};
 
 #[derive(Debug)]
-pub enum AppError {
+pub enum Error {
     // Errors from crates
     ReqwestError(reqwest::Error),
     // Errors from this crate
-    StandardError(StandardErrorType),
-    CustomError(String)
+    ScraperError(ScraperErrorType)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum StandardErrorType {
+pub enum ScraperErrorType {
     ElementNotFound,
     AttributeNotFound
 }
 
-impl From<reqwest::Error> for AppError {
-    fn from(err: reqwest::Error) -> AppError {
-        AppError::ReqwestError(err)
+impl From<reqwest::Error> for Error {
+    fn from(err: reqwest::Error) -> Error {
+        Error::ReqwestError(err)
     }
 }
 
-impl StandardErrorType {
-    fn as_str(&self) -> &str {
-        match *self {
-            StandardErrorType::ElementNotFound   => "Element not found",
-            StandardErrorType::AttributeNotFound => "Attribute not found"
-        }
-    }
-}
+impl error::Error for Error {}
 
-impl error::Error for AppError {}
-
-impl fmt::Display for AppError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            AppError::ReqwestError(ref err)  => err.fmt(f),
-            AppError::StandardError(ref err) => write!(f, "Error occurred {:?}", err),
-            AppError::CustomError(ref err)   => write!(f, "Error occurred {:?}", err)
+            Error::ReqwestError(ref err)  => err.fmt(f),
+            Error::ScraperError(ref err) => write!(f, "Error occurred {:?}", err)
         }
     }
 }
