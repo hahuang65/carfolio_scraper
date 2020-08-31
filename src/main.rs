@@ -37,7 +37,7 @@ impl Page {
     fn new(url: &str) -> Page {
         match Self::get_html(url) {
             Ok(html) => Self { html: html },
-            Err(e)   => panic!(e)
+            Err(e)   => panic!("{}", e)
         }
     }
 
