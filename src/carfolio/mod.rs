@@ -3,14 +3,17 @@ use logging_timer::time;
 mod make;
 mod model;
 
+use make::makes;
+use model::models;
+
 use crate::error::Error;
 
 #[time("info")]
 pub(crate) fn scrape() -> Result<(), Error> {
-    match make::makes() {
+    match makes() {
         Ok(makes) => {
             makes.iter().map(|make| {
-                match model::models(make.to_owned()) {
+                match models(make.to_owned()) {
                     Ok(model) => Ok(model),
                     Err(e) => return Err(e)
                 }

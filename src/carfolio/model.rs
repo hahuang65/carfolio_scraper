@@ -1,6 +1,8 @@
 use scraper::element_ref::ElementRef;
 
 use crate::error::Error;
+use crate::{element_attr, element_within, inner_html};
+use crate::Page;
 
 const BASE_URL: &str = "https://carfolio.com";
 
@@ -14,23 +16,23 @@ pub struct Model {
 }
 
 fn extract_url(element: ElementRef) -> Result<String, Error> {
-    let path = crate::element_attr(element, "div.card-head a", "href")?;
+    let path = element_attr(element, "div.card-head a", "href")?;
     Ok(format!("{}/{}", BASE_URL, path))
 }
 
 fn extract_name(element: ElementRef) -> Result<String, Error> {
-    crate::inner_html(element, "span.model.name")
+    inner_html(element, "span.model.name")
 }
 
 fn extract_year(element: ElementRef) -> Result<String, Error> {
-    let span = crate::element_within(element, vec!["div.card-head a span.automobile"])?;
-    let elem = crate::element_within(span, vec!["span.Year", "span.model-year"])?;
+    let span = element_within(element, vec!["div.card-head a span.automobile"])?;
+    let elem = element_within(span, vec!["span.Year", "span.model-year"])?;
     Ok(elem.inner_html())
 }
 
 pub(super) fn models(make: Make) -> Result<Vec<Model>, Error> {
     info!("Requesting Models data for {}", make.name);
-    let page = crate::Page::new(&make.url);
+    let page = Page::new(&make.url);
 
     page.elements("div.grid div.grid-card").iter().map(|div| {
         debug!("div: {:?}", div.inner_html().trim());
