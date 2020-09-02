@@ -17,7 +17,8 @@ mod carfolio;
 
 use error::Error;
 use error::Error::ScraperError;
-use error::ScraperErrorType::{ElementNotFound, AttributeNotFound};
+use error::ScraperErrorKind::{ElementError, AttributeError};
+use error::{ElementNotFound, AttributeNotFound};
 
 fn main() -> Result<(), Error> {
     pretty_env_logger::init();
@@ -73,7 +74,7 @@ fn element_within<'a>(element: ElementRef<'a>, selectors: Vec<&'_ str>) -> Resul
 
     match elem {
         Some(elem) => Ok(elem),
-        None       => Err(ScraperError(ElementNotFound))
+        None       => Err(ScraperError(ElementError(ElementNotFound::new(element, selectors))))
     }
 }
 
@@ -82,7 +83,7 @@ fn element_attr(element: ElementRef, selector: &str, attr: &str) -> Result<Strin
 
     match elem.value().attr(attr) {
         Some(attr) => Ok(attr.to_string()),
-        None       => Err(ScraperError(AttributeNotFound))
+        None       => Err(ScraperError(AttributeError(AttributeNotFound::new(elem, attr))))
     }
 }
 
