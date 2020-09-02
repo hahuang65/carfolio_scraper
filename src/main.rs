@@ -19,10 +19,10 @@ use error::Error;
 use error::Error::ScraperError;
 use error::ScraperErrorType::{ElementNotFound, AttributeNotFound};
 
-fn main() {
+fn main() -> Result<(), Error> {
     pretty_env_logger::init();
 
-    carfolio::scrape();
+    carfolio::scrape()
 }
 
 lazy_static! {
@@ -30,13 +30,14 @@ lazy_static! {
 }
 
 struct Page {
+    url: String,
     html: Html
 }
 
 impl Page {
     fn new(url: &str) -> Page {
         match Self::get_html(url) {
-            Ok(html) => Self { html: html },
+            Ok(html) => Self { url: String::from(url), html: html },
             Err(e)   => panic!("{}", e)
         }
     }
@@ -44,16 +45,23 @@ impl Page {
     #[tokio::main]
     #[time("info")]
     async fn get_html(url: &str) -> Result<Html, reqwest::Error> {
-        info!("Scraping HTML from {}", url);
+        info!("Fetching HTML from {}", url);
         let resp = REQWEST_CLIENT.get(url).send().await?;
         let body = resp.text().await?;
         
         Ok(Html::parse_document(&body))
     }
 
-    fn elements(&self, selector: &str) -> Vec<ElementRef> {
-        let selector = Selector::parse(&selector).unwrap();
-        self.html.select(&selector).collect()
+    fn elements(&self, selector_str: &str) -> Vec<ElementRef> {
+        let selector = Selector::parse(&selector_str).unwrap();
+        
+        let results: Vec<ElementRef> = self.html.select(&selector).collect();
+
+        if results.is_empty() {
+            warn!("No elements found for selector '{}' on {}", selector_str, self.url)
+        }
+
+        results
     }
 }
 
