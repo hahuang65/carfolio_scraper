@@ -72,7 +72,7 @@ impl Page {
     }
 }
 
-fn element_within<'a>(element: ElementRef<'a>, selectors: Vec<&'_ str>) -> Result<ElementRef<'a>, Error> {
+fn element_within<'a>(element: ElementRef<'a>, selectors: &[&str]) -> Result<ElementRef<'a>, Error> {
     let elem = selectors.iter().find_map(|selector| {
         let selector = Selector::parse(&selector).unwrap();
         element.select(&selector).next()
@@ -85,7 +85,7 @@ fn element_within<'a>(element: ElementRef<'a>, selectors: Vec<&'_ str>) -> Resul
 }
 
 fn element_attr(element: ElementRef, selector: &str, attr: &str) -> Result<String, Error> {
-    let elem = element_within(element, vec![selector])?;
+    let elem = element_within(element, &[selector])?;
 
     match elem.value().attr(attr) {
         Some(attr) => Ok(attr.to_string()),
@@ -94,6 +94,6 @@ fn element_attr(element: ElementRef, selector: &str, attr: &str) -> Result<Strin
 }
 
 fn inner_html(element: ElementRef, selector: &str) -> Result<String, Error> {
-    let elem = element_within(element, vec![selector])?;
+    let elem = element_within(element, &[selector])?;
     Ok(elem.inner_html())
 }

@@ -131,8 +131,8 @@ fn extract_model_name(element: ElementRef) -> Result<String, Error> {
 }
 
 fn extract_model_year(element: ElementRef) -> Result<String, Error> {
-    let span = element_within(element, vec!["div.card-head a span.automobile"])?;
-    let elem = element_within(span, vec!["span.Year", "span.model-year"])?;
+    let span = element_within(element, &["div.card-head a span.automobile"])?;
+    let elem = element_within(span, &["span.Year", "span.model-year"])?;
     Ok(elem.inner_html())
 }
 

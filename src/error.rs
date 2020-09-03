@@ -38,7 +38,7 @@ pub(crate) struct ElementNotFound {
 }
 
 impl ElementNotFound {
-    pub fn new(html: ElementRef, elements: Vec<&str>) -> ElementNotFound {
+    pub fn new(html: ElementRef, elements: &[&str]) -> ElementNotFound {
         let html = String::from(html.inner_html().trim());
         let elements = elements.join(", ");
         
