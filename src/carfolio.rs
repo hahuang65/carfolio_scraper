@@ -98,21 +98,23 @@ fn extract_make_country(element: ElementRef) -> Result<String, Error> {
 fn make_links(page: Page) -> Result<Vec<String>, Error> {
     info!("Parsing for Make links...");
 
-    page.elements("div.grid div[class^=\"m\"]").iter().filter(|div| {
-        match extract_make_name(**div) {
-            Ok(name) => MAKES.contains(name.as_str()),
-            Err(_)   => false
-        }
-    }).map(|div| {
+    let mut links = vec![];
+
+    for div in page.elements("div.grid div[class^=\"m\"]") {
         debug!("HTML: {:?}", div.inner_html().trim());
 
-        let name = extract_make_name(*div)?;
-        let url = extract_make_url(*div)?;
-        let country = extract_make_country(*div)?;
-        info!("Link found for Make: {} ({}) - {}", name, country, url);
+        let name = extract_make_name(div)?;
 
-        Ok(url)
-    }).collect::<Result<Vec<String>, Error>>()
+        if MAKES.contains(name.as_str()) {
+            let url = extract_make_url(div)?;
+            let country = extract_make_country(div)?;
+            info!("Link found for Make: {} ({}) - {}", name, country, url);
+
+            links.push(url);
+        }
+    }
+
+    Ok(links)
 }
 
 fn extract_model_url(element: ElementRef) -> Result<String, Error> {
