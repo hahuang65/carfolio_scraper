@@ -5,7 +5,67 @@ use crate::error::Error;
 use crate::{element_attr, element_within, inner_html};
 use crate::Page;
 
-const BASE_URL: &str = "https://carfolio.com";
+static BASE_URL: &str = "https://carfolio.com";
+lazy_static! {
+    static ref MAKES: std::collections::BTreeSet<&'static str> = [
+        "Acura",
+        "Alfa Romeo",
+        "Ariel",
+        "Aston Martin",
+        "Audi",
+        "BAC",
+        "BMW",
+        "Bugatti",
+        "Buick",
+        "Cadillac",
+        "Caterham",
+        "Chevrolet",
+        "Chrysler",
+        "Dodge",
+        "Ferrari",
+        "Fiat",
+        "Ford",
+        "Honda",
+        "Hyundai",
+        "Infiniti",
+        "Jaguar",
+        "Jeep",
+        "Kia",
+        "Koenigsegg",
+        "Lamborghini",
+        "Land Rover",
+        "Lexus",
+        "Lincoln",
+        "Lotus",
+        "Maserati",
+        "Mazda",
+        "McLaren",
+        "Mercedes-Benz",
+        "MINI",
+        "Mitsubishi",
+        "Nissan",
+        "Oldsmobile",
+        "Pagani",
+        "Plymouth",
+        "Polestar",
+        "Pontiac",
+        "Porsche",
+        "Rolls-Royce",
+        "Saab",
+        "Saturn",
+        "Scion",
+        "Shelby",
+        "Shelby Super Cars",
+        "smart",
+        "Subaru",
+        "Suzuki",
+        "Tesla",
+        "Toyota",
+        "Volkswagen",
+        "Volvo",
+        "Zenvo"
+    ].iter().cloned().collect();
+}
 
 #[time("info")]
 pub(crate) fn scrape() -> Result<(), Error> {
@@ -38,11 +98,16 @@ fn extract_make_country(element: ElementRef) -> Result<String, Error> {
 fn make_links(page: Page) -> Result<Vec<String>, Error> {
     info!("Parsing for Make links...");
 
-    page.elements("div.grid div[class^=\"m\"]").iter().map(|div| {
+    page.elements("div.grid div[class^=\"m\"]").iter().filter(|div| {
+        match extract_make_name(**div) {
+            Ok(name) => MAKES.contains(name.as_str()),
+            Err(_)   => false
+        }
+    }).map(|div| {
         debug!("HTML: {:?}", div.inner_html().trim());
 
-        let url = extract_make_url(*div)?;
         let name = extract_make_name(*div)?;
+        let url = extract_make_url(*div)?;
         let country = match extract_make_country(*div) {
             Ok(country) => country,
             Err(_)  => {
@@ -79,18 +144,19 @@ fn extract_model_year(element: ElementRef) -> Result<String, Error> {
 fn model_links(page: Page) -> Result<Vec<String>, Error> {
     info!("Parsing for Model links...");
 
+    let make = extract_model_make(page.html.root_element())?;
+
     page.elements("div.grid div.grid-card").iter().map(|div| {
         debug!("HTML: {:?}", div.inner_html().trim());
 
         let url = extract_model_url(*div)?;
-        let make = extract_model_make(*div)?;
-        let name = extract_model_name(*div)?;
+        let name = match extract_model_name(*div) {
+            Ok(name) => name,
+            Err(_)   => "".to_string()
+        };
         let year = match extract_model_year(*div) {
             Ok(year) => year,
-            Err(_)   => {
-                warn!("Unable to find year for model: {} {} ({})", make, name, url);
-                "".to_string()
-            }
+            Err(_)   => "".to_string()
         };
         info!("Link found for Model: {} {} {} - {}", year, make, name, url);
 
