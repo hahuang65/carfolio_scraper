@@ -108,13 +108,7 @@ fn make_links(page: Page) -> Result<Vec<String>, Error> {
 
         let name = extract_make_name(*div)?;
         let url = extract_make_url(*div)?;
-        let country = match extract_make_country(*div) {
-            Ok(country) => country,
-            Err(_)  => {
-                warn!("Unable to find country for make: {} ({})", name, url);
-                "".to_string()
-            }
-        };
+        let country = extract_make_country(*div)?;
         info!("Link found for Make: {} ({}) - {}", name, country, url);
 
         Ok(url)
@@ -142,9 +136,8 @@ fn extract_model_year(element: ElementRef) -> Result<String, Error> {
 
 #[time("info")]
 fn model_links(page: Page) -> Result<Vec<String>, Error> {
-    info!("Parsing for Model links...");
-
     let make = extract_model_make(page.html.root_element())?;
+    info!("Parsing for Model links for {}...", make);
 
     page.elements("div.grid div.grid-card").iter().map(|div| {
         debug!("HTML: {:?}", div.inner_html().trim());
@@ -152,11 +145,17 @@ fn model_links(page: Page) -> Result<Vec<String>, Error> {
         let url = extract_model_url(*div)?;
         let name = match extract_model_name(*div) {
             Ok(name) => name,
-            Err(_)   => "".to_string()
+            Err(_)   => {
+                warn!("Unable to find name for model: {}", url);
+                "".to_string()
+            }
         };
         let year = match extract_model_year(*div) {
             Ok(year) => year,
-            Err(_)   => "".to_string()
+            Err(_)   => {
+                warn!("Unable to find year for model: {}", url);
+                "".to_string()
+            }
         };
         info!("Link found for Model: {} {} {} - {}", year, make, name, url);
 

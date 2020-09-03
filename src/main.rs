@@ -23,7 +23,13 @@ use error::{ElementNotFound, AttributeNotFound};
 fn main() -> Result<(), Error> {
     pretty_env_logger::init();
 
-    carfolio::scrape()
+    match carfolio::scrape() {
+        Err(e) => {
+            error!("{}", e);
+            Ok(())
+        }
+        _      => Ok(())
+    }
 }
 
 lazy_static! {

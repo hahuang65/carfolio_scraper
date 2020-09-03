@@ -26,7 +26,7 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             Error::ReqwestError(ref err) => err.fmt(f),
-            Error::ScraperError(ref err) => write!(f, "{:?}", err)
+            Error::ScraperError(ref err) => write!(f, "{}", err)
         }
     }
 }
@@ -42,7 +42,6 @@ impl ElementNotFound {
         let html = String::from(html.inner_html().trim());
         let elements = elements.join(", ");
         
-        error!("Unable to find elements '{}' within HTML:\n{}", elements, html);
         ElementNotFound {
             html: String::from(html),
             elements: elements
@@ -60,10 +59,18 @@ impl AttributeNotFound {
     pub fn new(element: ElementRef, attribute: &str) -> AttributeNotFound {
         let element = String::from(element.html().trim());
         
-        error!("Unable to find attribute '{}' within HTML:\n{}", element, attribute);
         AttributeNotFound {
             element: element,
             attribute: String::from(attribute)
+        }
+    }
+}
+
+impl std::fmt::Display for ScraperErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScraperErrorKind::ElementError(ElementNotFound { elements, html }) => write!(f, "Unable to find elements '{}' within HTML:\n{}", elements, html),
+            ScraperErrorKind::AttributeError(AttributeNotFound { element, attribute }) => write!(f, "Unable to find attribute '{}' within HTML:\n{}", element, attribute),
         }
     }
 }
