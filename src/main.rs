@@ -97,3 +97,7 @@ fn inner_html(element: ElementRef, selector: &str) -> Result<String, Error> {
     let elem = element_within(element, &[selector])?;
     Ok(elem.inner_html())
 }
+
+fn inner_text(element: ElementRef) -> String {
+    element.text().into_iter().collect::<Vec<&str>>().join("")
+}
