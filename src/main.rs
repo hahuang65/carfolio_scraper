@@ -15,12 +15,12 @@ use scraper::element_ref::ElementRef;
 mod error;
 mod carfolio;
 
-use error::Error;
+use error::Result;
 use error::Error::ScraperError;
 use error::ScraperErrorKind::{ElementError, AttributeError};
 use error::{ElementNotFound, AttributeNotFound};
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<()> {
     pretty_env_logger::init();
 
     match carfolio::scrape() {
@@ -51,7 +51,7 @@ impl Page {
 
     #[tokio::main]
     #[time("info")]
-    async fn get_html(url: &str) -> Result<Html, reqwest::Error> {
+    async fn get_html(url: &str) -> Result<Html> {
         info!("Fetching HTML from {}", url);
         let resp = REQWEST_CLIENT.get(url).send().await?;
         let body = resp.text().await?;
@@ -72,7 +72,7 @@ impl Page {
     }
 }
 
-fn element_within<'a>(element: ElementRef<'a>, selectors: &[&str]) -> Result<ElementRef<'a>, Error> {
+fn element_within<'a>(element: ElementRef<'a>, selectors: &[&str]) -> Result<ElementRef<'a>> {
     let elem = selectors.iter().find_map(|selector| {
         let selector = Selector::parse(&selector).unwrap();
         element.select(&selector).next()
@@ -84,7 +84,7 @@ fn element_within<'a>(element: ElementRef<'a>, selectors: &[&str]) -> Result<Ele
     }
 }
 
-fn element_attr(element: ElementRef, selector: &str, attr: &str) -> Result<String, Error> {
+fn element_attr(element: ElementRef, selector: &str, attr: &str) -> Result<String> {
     let elem = element_within(element, &[selector])?;
 
     match elem.value().attr(attr) {
@@ -93,7 +93,7 @@ fn element_attr(element: ElementRef, selector: &str, attr: &str) -> Result<Strin
     }
 }
 
-fn inner_html(element: ElementRef, selector: &str) -> Result<String, Error> {
+fn inner_html(element: ElementRef, selector: &str) -> Result<String> {
     let elem = element_within(element, &[selector])?;
     Ok(elem.inner_html())
 }

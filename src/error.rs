@@ -1,9 +1,12 @@
 use scraper::element_ref::ElementRef;
 
+pub(crate) type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug)]
 pub(crate) enum Error {
     // Errors from crates
     ReqwestError(reqwest::Error),
+    ParseIntError(std::num::ParseIntError),
     // Errors from this crate
     ScraperError(ScraperErrorKind)
 }
@@ -20,12 +23,19 @@ impl From<reqwest::Error> for Error {
     }
 }
 
+impl From<std::num::ParseIntError> for Error {
+    fn from(err: std::num::ParseIntError) -> Error {
+        Error::ParseIntError(err)
+    }
+}
+
 impl std::error::Error for Error {}
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             Error::ReqwestError(ref err) => err.fmt(f),
+            Error::ParseIntError(ref err) => err.fmt(f),
             Error::ScraperError(ref err) => write!(f, "{}", err)
         }
     }
