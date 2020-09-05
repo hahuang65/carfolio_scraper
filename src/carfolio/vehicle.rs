@@ -11,8 +11,24 @@ use crate::Page;
 type Specification<T> = Option<(T, String)>;
 
 pub(crate) struct Vehicle {
+    aspiration: Option<String>,
+    body_type: Option<String>,
+    bore_stroke: Specification<String>,
+    carfolio_id: Option<String>,
+    compression_ratio: Option<String>,
     curb_weight: Specification<u16>,
+    displacement: Specification<f32>,
     door_count: Option<u8>,
+    drive_wheel_config: Option<String>,
+    engine_code: Option<String>,
+    engine_config: Option<String>,
+    engine_construction: Option<String>,
+    engine_coolant: Option<String>,
+    engine_layout: Option<String>,
+    engine_manufacturer: Option<String>,
+    engine_position: Option<String>,
+    engine_type: Option<String>,
+    final_drive_ratio: Option<f32>,
     fuel_capacity: Specification<f32>,
     ground_clearance: Specification<u16>,
     height: Specification<u16>,
@@ -45,9 +61,41 @@ impl Vehicle {
         info!("Specifications for {} {} {}:\n{:#?}", year, make, model, specifications);
 
         let vehicle = Vehicle {
+            aspiration: specification(&mut specifications, "aspiration", extract_string),
+
+            body_type: specification(&mut specifications, "body_type", extract_string),
+
+            bore_stroke: specification(&mut specifications, "bore_×_stroke", extract_bore_stroke),
+
+            carfolio_id: specification(&mut specifications, "carfolio.com_id", extract_string),
+
+            compression_ratio: specification(&mut specifications, "compression_ratio", extract_string),
+
             curb_weight: specification(&mut specifications, "kerb_weight", extract_u16_with_unit),
 
+            displacement: specification(&mut specifications, "capacity", extract_displacement),
+
             door_count: specification(&mut specifications, "number_of_doors", extract_u8),
+
+            drive_wheel_config: specification(&mut specifications, "drive_wheels", extract_string),
+
+            engine_code: specification(&mut specifications, "engine_code", extract_string),
+
+            engine_config: specification(&mut specifications, "cylinders", extract_string),
+
+            engine_construction: specification(&mut specifications, "engine_construction", extract_string),
+
+            engine_coolant: specification(&mut specifications, "engine_coolant", extract_string),
+
+            engine_layout: specification(&mut specifications, "engine_layout", extract_string),
+
+            engine_manufacturer: specification(&mut specifications, "engine_manufacturer", extract_string),
+
+            engine_position: specification(&mut specifications, "engine_position", extract_string),
+
+            engine_type: specification(&mut specifications, "engine_type", extract_string),
+
+            final_drive_ratio: specification(&mut specifications, "final_drive_ratio", extract_f32),
 
             fuel_capacity: specification(&mut specifications, "fuel_tank_capacity", extract_f32_with_unit),
 
@@ -96,13 +144,13 @@ impl Vehicle {
         };
 
         let unused_keys = specifications.iter().filter_map(|(k, v)| {
-            if *v == "" {
-                Some(k)
+            if *v != "" {
+                Some((k, v))
             } else {
                 None
             }
-        }).collect::<Vec<&String>>();
-        info!("Unused fields from Details map: {:#?}", unused_keys);
+        }).collect::<Vec<(&String, &String)>>();
+        warn!("Unused fields from Details map: {:#?}", unused_keys);
 
         Ok(vehicle)
     }
@@ -163,7 +211,7 @@ fn extract_power_or_torque(string: String, re: Regex) -> Option<BTreeMap<String,
             value = match caps.get(1) {
                 Some(str) => extract_u16_with_unit(str.as_str().to_string()),
                 None      => {
-                    warn!("Could not parse value from '{}' with regex '{}'", string, re);
+                    warn!("Value was unable to be parsed from '{}' with regex '{}'", string, re);
                     None
                 }
             };
@@ -181,6 +229,29 @@ fn extract_power_or_torque(string: String, re: Regex) -> Option<BTreeMap<String,
     map.insert(String::from("Value"), value);
     map.insert(String::from("RPM"), rpm);
     Some(map)
+}
+
+fn extract_bore_stroke(string: String) -> Specification<String> {
+    extract_string_with_unit(string.replace(" x ", "x"))
+}
+
+fn extract_displacement(string: String) -> Specification<f32> {
+    let re = Regex::new(r"(\d+.\d+ litre)").unwrap();
+    match re.captures(&string) {
+        Some(caps) => {
+            match caps.get(1) {
+                Some(str) => extract_f32_with_unit(str.as_str().to_string()),
+                None      => {
+                    warn!("Could not parse displacement from '{}' with regex '{}'", string, re);
+                    None
+                }
+            }
+        },
+        None => {
+            warn!("Could not parse displacement from '{}' with regex '{}'", string, re);
+            None
+        }
+    }
 }
 
 fn extract_string(string: String) -> Option<String> {
