@@ -8,6 +8,35 @@ use crate::error::Result;
 use crate::{element_within, inner_text};
 use crate::Page;
 
+lazy_static! {
+    static ref IGNORED_FIELDS: std::collections::BTreeSet<&'static str> = [
+        "bmep_(brake_mean_effective_pressure)",
+        "bore/stroke_ratio",
+        "brakes_f/r",
+        "catalytic_converter",
+        "compressor",
+        "front_brake_diameter",
+        "fuel_consumption",
+        "fuel_system",
+        "intercooler",
+        "km/litre",
+        "length:wheelbase_ratio",
+        "litres/100km",
+        "rac_rating",
+        "rear_brake_diameter",
+        "specific_output",
+        "specific_torque",
+        "sump",
+        "turns_lock-to-lock",
+        "uk_mpg",
+        "unitary_capacity"
+    ].iter().cloned().collect();
+
+    static ref IGNORED_ROWS: std::collections::BTreeSet<&'static str> = [
+        "universal fuel consumption (calculated from the above)"
+    ].iter().cloned().collect();
+}
+
 type Specification<T> = Option<(T, String)>;
 
 pub(crate) struct Vehicle {
@@ -58,7 +87,7 @@ impl Vehicle {
         info!("Parsing Model specifications for {} {} {}", year, make, model);
 
         let mut specifications = extract_model_specifications_table(page)?;
-        info!("Specifications for {} {} {}:\n{:#?}", year, make, model, specifications);
+        debug!("Specifications for {} {} {}:\n{:#?}", year, make, model, specifications);
 
         let vehicle = Vehicle {
             aspiration: specification(&mut specifications, "aspiration", extract_string),
@@ -144,13 +173,16 @@ impl Vehicle {
         };
 
         let unused_keys = specifications.iter().filter_map(|(k, v)| {
-            if *v != "" {
+            if *v != "" && !IGNORED_FIELDS.contains(k.as_str()) {
                 Some((k, v))
             } else {
                 None
             }
         }).collect::<Vec<(&String, &String)>>();
-        warn!("Unused fields from Details map: {:#?}", unused_keys);
+
+        if !unused_keys.is_empty() {
+            warn!("Unused fields from Details map: {:#?}", unused_keys);
+        }
 
         Ok(vehicle)
     }
@@ -158,13 +190,13 @@ impl Vehicle {
 
 fn specification<T: Debug>(map: &mut BTreeMap<String, String>, key: &str, parse_using: fn(String) -> Option<T>) -> Option<T> {
     let string = map.remove(key).unwrap_or_default();
-    info!("{} unparsed: {}", key, string);
+    debug!("{} unparsed: {}", key, string);
     let parsed_value = parse_using(string);
 
     if parsed_value.is_none() {
         warn!("{} was unable to be parsed", key);
     } else {
-        info!("{} parsed: {:?}", key, parsed_value);
+        debug!("{} parsed: {:?}", key, parsed_value);
     }
 
     parsed_value
@@ -305,10 +337,14 @@ fn extract_model_name(span: ElementRef) -> Result<String> {
 fn extract_model_specifications_table(page: Page) -> Result<BTreeMap<String, String>> {
     let mut table = BTreeMap::new();
     for row in page.elements("table.specstable tbody tr") {
-        let spec_name = element_within(row, &["th:not(.sechead)"]);
+        let th = element_within(row, &["th:not(.sechead)"]);
 
-        if spec_name.is_ok() {
-            let spec_name = lower_underscore(inner_text(spec_name.unwrap()));
+        if th.is_ok() {
+            let th_text = inner_text(th.unwrap());
+            if IGNORED_ROWS.contains(th_text.as_str()) {
+                continue;
+            };
+            let spec_name = lower_underscore(th_text);
             if spec_name != "" {
                 let td = match element_within(row, &["td"]) {
                     Ok(string) => sanitize_text(inner_text(string)),
