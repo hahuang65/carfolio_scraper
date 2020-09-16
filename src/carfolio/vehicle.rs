@@ -14,7 +14,9 @@ lazy_static! {
         "bore/stroke_ratio",
         "brakes_f/r",
         "catalytic_converter",
+        "cda",
         "compressor",
+        "frontal_area",
         "front_brake_diameter",
         "fuel_consumption",
         "fuel_system",
@@ -22,10 +24,14 @@ lazy_static! {
         "km/litre",
         "length:wheelbase_ratio",
         "litres/100km",
+        "maximum_power_output(sae_net)",
+        "maximum_torque(sae_net)",
         "rac_rating",
         "rear_brake_diameter",
         "specific_output",
+        "specific_output(sae_net)",
         "specific_torque",
+        "specific_torque(sae_net)",
         "sump",
         "turns_lock-to-lock",
         "uk_mpg",
@@ -34,6 +40,11 @@ lazy_static! {
 
     static ref IGNORED_ROWS: std::collections::BTreeSet<&'static str> = [
         "universal fuel consumption (calculated from the above)"
+    ].iter().cloned().collect();
+
+    static ref USELESS_VALUES: std::collections::BTreeSet<&'static str> = [
+        "",
+        "N/A"
     ].iter().cloned().collect();
 }
 
@@ -48,6 +59,7 @@ pub(crate) struct Vehicle {
     curb_weight: Specification<u16>,
     displacement: Specification<f32>,
     door_count: Option<u8>,
+    drag_coefficient: Option<f32>,
     drive_wheel_config: Option<String>,
     engine_code: Option<String>,
     engine_config: Option<String>,
@@ -62,6 +74,7 @@ pub(crate) struct Vehicle {
     ground_clearance: Specification<u16>,
     height: Specification<u16>,
     length: Specification<u16>,
+    max_speed: Specification<u16>,
     mpg: Option<(f32, f32, f32)>,
     power: BTreeMap<String, Specification<u16>>,
     power_to_weight_ratio: Specification<f32>,
@@ -72,10 +85,12 @@ pub(crate) struct Vehicle {
     track: BTreeMap<String, Specification<u16>>,
     transmission: Option<String>,
     valve_config: Option<String>,
+    weight_distribution: Option<String>,
     weight_to_power_ratio: Specification<f32>,
     wheel_size: BTreeMap<String, Option<String>>,
     wheelbase: Specification<u16>,
-    width: Specification<u16>
+    width: Specification<u16>,
+    zero_to_sixty: Specification<f32>
 }
 
 impl Vehicle {
@@ -106,6 +121,8 @@ impl Vehicle {
 
             door_count: specification(&mut specifications, "number_of_doors", extract_u8),
 
+            drag_coefficient: specification(&mut specifications, "drag_coefficient", extract_f32),
+
             drive_wheel_config: specification(&mut specifications, "drive_wheels", extract_string),
 
             engine_code: specification(&mut specifications, "engine_code", extract_string),
@@ -134,6 +151,8 @@ impl Vehicle {
 
             length: specification(&mut specifications, "length", extract_u16_with_unit),
 
+            max_speed: specification(&mut specifications, "maximum_speed", extract_max_speed),
+
             mpg: specification(&mut specifications, "us_mpg", extract_mpg),
 
             power: specification(&mut specifications, "maximum_power_output", extract_power).unwrap(),
@@ -160,6 +179,8 @@ impl Vehicle {
 
             valve_config: specification(&mut specifications, "valve_gear", extract_string),
 
+            weight_distribution: specification(&mut specifications, "weight_distribution", extract_string),
+
             weight_to_power_ratio: specification(&mut specifications, "weight-to-power_ratio", extract_f32_with_unit),
 
             wheel_size: vec![
@@ -170,6 +191,8 @@ impl Vehicle {
             wheelbase: specification(&mut specifications, "wheelbase", extract_u16_with_unit),
 
             width: specification(&mut specifications, "width", extract_u16_with_unit),
+
+            zero_to_sixty: specification(&mut specifications, "acceleration_0-60mph", extract_f32_with_unit),
         };
 
         let unused_keys = specifications.iter().filter_map(|(k, v)| {
@@ -205,6 +228,26 @@ fn specification<T: Debug>(map: &mut BTreeMap<String, String>, key: &str, parse_
 fn split_string(string: String) -> Vec<String> {
     let re = Regex::new(r"[, ]+").unwrap();
     re.split(&string).map(|s| s.to_string()).collect()
+}
+
+fn extract_max_speed(string: String) -> Specification<u16> {
+    let re = Regex::new(r"(\d+ mph)").unwrap();
+
+    match re.captures(&string) {
+        Some(caps) => {
+            match caps.get(1) {
+                Some(str) => extract_u16_with_unit(str.as_str().to_string()),
+                None      => {
+                    warn!("Maximum speed was unable to be parsed from '{}' with regex '{}'", string, re);
+                    None
+                }
+            }
+        },
+        None => {
+            warn!("Unable to find matches in '{}' with regex '{}'", string, re);
+            None
+        }
+    }
 }
 
 fn extract_mpg(string: String) -> Option<(f32, f32, f32)> {
@@ -353,6 +396,10 @@ fn extract_model_specifications_table(page: Page) -> Result<BTreeMap<String, Str
                         "".to_string()
                     }
                 };
+                if USELESS_VALUES.contains(td.as_str()) {
+                    continue;
+                }
+
                 table.insert(spec_name, td);
             }
         };
